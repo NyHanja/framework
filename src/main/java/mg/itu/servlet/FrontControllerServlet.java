@@ -1,22 +1,39 @@
 package mg.itu.servlet;
 
 import java.io.*;
+import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Map;
+
 import mg.itu.annotation.Controller;
+import mg.itu.model.RouteMapping;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import mg.itu.util.Utilitaire;
 
 public class FrontControllerServlet extends HttpServlet {
-    
+
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        response.setContentType("text/html");
-        PrintWriter out = response.getWriter();
 
-        out.println("<h1>Front Controller</h1>");
-        out.println("<p>URL recue : " + request.getRequestURL() + "</p>");
+        String url = request.getRequestURI().substring(request.getContextPath().length());
 
+        RouteMapping mapping = routes.get(url);
+
+        if (mapping == null) {
+            response.setContentType("text/html;charset=UTF-8");
+            PrintWriter out = response.getWriter();
+            out.println("<h3 style='color:red'>tsy fantatro io url io fa reto iany no url fantatra : " + url + "</h3>");
+            out.println("<ul>");
+            for (String u : routes.keySet()) {
+                out.println("<li>" + u + "</li>");
+            }
+            out.println("</ul>");
+            return;
+        }
+
+        request.setAttribute("route", mapping);
+        request.getRequestDispatcher("/index.jsp").forward(request, response);
     }
 
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -28,6 +45,8 @@ public class FrontControllerServlet extends HttpServlet {
             throws ServletException, IOException {
         processRequest(request, response);
     }
+
+    private Map<String, RouteMapping> routes;
 
     @Override
     public void init() throws ServletException {
@@ -41,19 +60,23 @@ public class FrontControllerServlet extends HttpServlet {
                     classes,
                     Controller.class);
 
+            routes = Utilitaire.getUrlMappings(
+                    controllers);
+
             System.out.println(
-                    "=== Controllers trouvés ===");
+                    "=== URL disponibles ===");
 
-            for (Class<?> controller : controllers) {
+            for (String url : routes.keySet()) {
 
-                System.out.println(
-                        controller.getName());
+                System.out.println(url);
+
             }
 
         } catch (Exception e) {
 
             throw new ServletException(e);
-        }
-    }
 
+        }
+
+    }
 }
