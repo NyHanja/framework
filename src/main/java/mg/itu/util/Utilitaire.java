@@ -4,7 +4,13 @@ import java.io.File;
 import java.lang.annotation.ElementType;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import mg.itu.annotation.UrlMapping;
+import mg.itu.model.RouteMapping;
+
 import java.net.URL;
 import java.lang.annotation.Annotation;
 
@@ -66,5 +72,47 @@ public class Utilitaire {
         }
 
         return result;
+    }
+
+    public static Map<String, RouteMapping> getUrlMappings(
+            List<Class<?>> classes) {
+
+        Map<String, RouteMapping> routes = new HashMap<>();
+
+        for (Class<?> classe : classes) {
+
+            Method[] methods = classe.getDeclaredMethods();
+
+            for (Method method : methods) {
+
+                if (method.isAnnotationPresent(UrlMapping.class)) {
+
+                    UrlMapping annotation = method.getAnnotation(UrlMapping.class);
+
+                    String url = annotation.value();
+
+                    if (routes.containsKey(url)) {
+
+                        throw new RuntimeException(
+                                "URL deja utilisee : " + url);
+
+                    }
+
+                    RouteMapping mapping = new RouteMapping(
+                            classe,
+                            method);
+
+                    routes.put(
+                            url,
+                            mapping);
+
+                }
+
+            }
+
+        }
+
+        return routes;
+
     }
 }
