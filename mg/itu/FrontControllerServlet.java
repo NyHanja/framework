@@ -8,6 +8,7 @@ import java.lang.annotation.ElementType;
 import java.lang.reflect.Method;
 import mg.itu.util.*;
 import java.util.*;
+import mg.itu.view.*;
 
 // @WebListener
 public class FrontControllerServlet extends HttpServlet implements ServletContextListener {
@@ -45,7 +46,8 @@ public class FrontControllerServlet extends HttpServlet implements ServletContex
         processRequest(request, response);
     }
 
-    protected void afficher(String url, String method, HttpServletRequest request, HttpServletResponse response, PrintWriter out)
+    protected void afficher(String url, String method, HttpServletRequest request, HttpServletResponse response,
+            PrintWriter out)
             throws ServletException, IOException {
 
         UrlMethod urlMethod = new UrlMethod(url, method);
@@ -60,7 +62,23 @@ public class FrontControllerServlet extends HttpServlet implements ServletContex
                 Method methode = mapping.getMethode();
                 Object resultat = methode.invoke(instance);
 
-                out.print("<script>console.log('" + resultat.toString() + "');</script>");
+                if (resultat instanceof ModelAndView) {
+                    ModelAndView mv = (ModelAndView) resultat;
+                    ViewResolver viewResolver = new ViewResolver();
+                    viewResolver.setNom_vue(mv.getNom_vue());
+                    viewResolver.setPrefix_vue(getServletContext().getInitParameter("prefixVue"));
+                    viewResolver.setExtension_vue(getServletContext().getInitParameter("suffixVue"));
+
+                    for (Map.Entry<String, Object> entry : mv.getAttributs().entrySet()) {
+                        request.setAttribute(entry.getKey(), entry.getValue());
+                    }
+
+                    RequestDispatcher dispatcher = request.getRequestDispatcher(viewResolver.getCheminCompletVue());
+                    dispatcher.forward(request, response);
+                } else {
+                    out.println("<p>Le résultat de la méthode n'est pas de type ModelAndView.</p>");
+                }
+
             } catch (Exception e) {
                 out.println("<p>Erreur lors de l'invocation de la méthode : " + e.getMessage() + "</p>");
             }
