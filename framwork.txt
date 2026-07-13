@@ -1,0 +1,54 @@
+Creer un framework spring from scratch
+
+Besoin:
+
+creer la classe FrontControllerServlet
+redefinir doGet, doPost
+creer une fonction processRequest
+
+Objectif: Spring mvc, web api
+
+comment creer une annotation, tester, recuperer
+
+classe, methode, attribut no afaka ametrahana annotation
+
+donc rehefa mcreer annotation de mila omena azy oe aiza avy no afaka ampiasana azy
+
+manamboatra annotation de manamboatra classe 1 itestena anle annotation
+
+ex: 
+@Controller 
+public class EmpController(){
+    @GetMapping('')
+    lister(@RequestMapping ...){
+        ModelAndView mv = ...
+
+        return mv;
+    }
+}
+
+
+
+------------------------------------------------
+Sprint3 et Sprint3 bis
+
+> Sprint 3:
+modifiena le UrlMapping, de asina argument vaovao oe ("GET"/"POST")
+
+Donc lasa miova le map au lieu de <url, Mapping> de lasa <urlMethod, Mapping>
+
+ao anaty Classe UrlMethode misy attribut 2: url, methoe (GET/POST)
+ avec fonction equals surdefini: rehefa misy urlMethod 2 mitovy de tsy afaka ampidirina ao anaty map le faharoa
+
+ 
+
+
+
+> Sprint 3 bis:
+invoquena le methode refa fantatra le url
+
+> Sprint 4
+mampiasa Listener: au demarrage appli web no manao ny asa rehetra ao anaty init
+
+
+
