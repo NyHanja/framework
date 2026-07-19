@@ -4,6 +4,7 @@ import java.io.File;
 import java.lang.annotation.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.net.URL;
 import java.util.*;
 
@@ -70,7 +71,8 @@ public class Utilitaire {
         }
     }
 
-    public static void recupererClassesAvecAnnotation(Utilitaire utilitaire, List<String> listeAvecAnnotation) throws Exception {
+    public static void recupererClassesAvecAnnotation(Utilitaire utilitaire, List<String> listeAvecAnnotation)
+            throws Exception {
         try {
             utilitaire.recupererElements(utilitaire, listeAvecAnnotation);
 
@@ -81,7 +83,6 @@ public class Utilitaire {
     }
 
     public void recupererElements(Utilitaire utilitaire, List<String> resultat) throws Exception {
-
 
         List<Class<?>> classes = new ArrayList<>();
         recupererClasses(utilitaire.getNom_package(), classes);
@@ -127,68 +128,85 @@ public class Utilitaire {
 
     }
 
-public static Map<UrlMethod, Mapping> recupererUrlMapping(Utilitaire utilitaire) throws Exception {
-    Map<UrlMethod, Mapping> urlMapping = new HashMap<>();
+    public static Map<UrlMethod, Mapping> recupererUrlMapping(Utilitaire utilitaire) throws Exception {
+        Map<UrlMethod, Mapping> urlMapping = new HashMap<>();
 
-    List<Class<?>> classes = new ArrayList<>();
-    recupererClasses(utilitaire.getNom_package(), classes);
+        List<Class<?>> classes = new ArrayList<>();
+        recupererClasses(utilitaire.getNom_package(), classes);
 
-    Class<?> annotationClass = Class.forName(utilitaire.getAnnotation());
+        Class<?> annotationClass = Class.forName(utilitaire.getAnnotation());
 
-    if (!annotationClass.isAnnotation()) {
-        throw new Exception("Ce n'est pas une annotation");
+        if (!annotationClass.isAnnotation()) {
+            throw new Exception("Ce n'est pas une annotation");
+        }
+
+        Class<? extends Annotation> annotation = annotationClass.asSubclass(Annotation.class);
+
+        Method valueMethod = annotation.getMethod("value");
+        Method methodUrl = annotation.getMethod("method");
+
+        for (Class<?> classe : classes) {
+            for (Method method : classe.getDeclaredMethods()) {
+
+                if (method.isAnnotationPresent(annotation)) {
+
+                    Annotation ann = method.getAnnotation(annotation);
+
+                    String url = (String) valueMethod.invoke(ann);
+                    String methodOfUrl = (String) methodUrl.invoke(ann);
+
+                    UrlMethod urlMethod = new UrlMethod(url, methodOfUrl);
+
+                    if (urlMapping.containsKey(urlMethod)) {
+                        throw new Exception("URL Deja utilise par un autre controller : " + urlMethod.getUrl()
+                                + " avec la methode : " + urlMethod.getMethod());
+                    }
+
+                    urlMapping.put(urlMethod, new Mapping(classe, method));
+                }
+            }
+        }
+
+        return urlMapping;
     }
 
-    Class<? extends Annotation> annotation = annotationClass.asSubclass(Annotation.class);
-
-    Method valueMethod = annotation.getMethod("value");
-    Method methodUrl = annotation.getMethod("method");
-
-    for (Class<?> classe : classes) {
-        for (Method method : classe.getDeclaredMethods()) {
-
-            if (method.isAnnotationPresent(annotation)) {
-
-                Annotation ann = method.getAnnotation(annotation);
-
-                String url = (String) valueMethod.invoke(ann);
-                String methodOfUrl = (String) methodUrl.invoke(ann);
-
-                UrlMethod urlMethod = new UrlMethod(url, methodOfUrl);
-
-
-                if(urlMapping.containsKey(urlMethod)){
-                    throw new Exception("URL Deja utilise par un autre controller : " + urlMethod.getUrl() + " avec la methode : " + urlMethod.getMethod());
-                }
-
-                urlMapping.put(urlMethod, new Mapping(classe, method));
+    public static void creerArguments(Method methode, Object[] arguments, Object applicationContext) {
+        for (int i = 0; i < methode.getParameters().length; i++) {
+            Parameter p = methode.getParameters()[i];
+            if (applicationContext != null && p.getType().isAssignableFrom(applicationContext.getClass())) {
+                arguments[i] = applicationContext;
             }
+
         }
     }
 
-    return urlMapping;
-}
+    public static void creerArguments(Method methode, Object[] arguments) {
+        for (int i = 0; i < methode.getParameters().length; i++) {
+            Parameter p = methode.getParameters()[i];
+        }
+    }
 
-// SANS REFLEXION
+    // SANS REFLEXION
 
-// public static Map<String, Mapping> recupererUrlMapping(Utilitaire utilitaire) throws Exception {
-//     Map<String, Mapping> urlMapping = new HashMap<>();
+    // public static Map<String, Mapping> recupererUrlMapping(Utilitaire utilitaire)
+    // throws Exception {
+    // Map<String, Mapping> urlMapping = new HashMap<>();
 
-//     List<Class<?>> classes = recupererClasses(utilitaire.getNom_package());
+    // List<Class<?>> classes = recupererClasses(utilitaire.getNom_package());
 
-//     for (Class<?> classe : classes) {
-//         for (Method method : classe.getDeclaredMethods()) {
+    // for (Class<?> classe : classes) {
+    // for (Method method : classe.getDeclaredMethods()) {
 
-//             if (method.isAnnotationPresent(UrlMapping.class)) {
+    // if (method.isAnnotationPresent(UrlMapping.class)) {
 
-//                 String url = (String) method.getAnnotation(UrlMapping.class).value();
+    // String url = (String) method.getAnnotation(UrlMapping.class).value();
 
-//                 urlMapping.put(url, new Mapping(classe, method));
-//             }
-//         }
-//     }
+    // urlMapping.put(url, new Mapping(classe, method));
+    // }
+    // }
+    // }
 
-//     return urlMapping;
-// }
+    // return urlMapping;
+    // }
 
 }

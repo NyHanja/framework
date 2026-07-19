@@ -4,18 +4,33 @@ import jakarta.servlet.*;
 import mg.itu.util.*;
 
 import java.lang.annotation.ElementType;
-import java.util.logging.*;
+
 import java.util.*;
 
 public class ApplicationListener implements ServletContextListener {
-
     @Override
     public void contextInitialized(ServletContextEvent servletContextEvent) {
         ServletContext servletContext = servletContextEvent.getServletContext();
+
         List<String> listeControllers = new ArrayList<>();
         Map<UrlMethod, Mapping> urlMapping;
 
         try {
+            try {
+                Class<?> utils = Class.forName(
+                        "org.springframework.web.context.support.WebApplicationContextUtils");
+
+                Object ctx = utils
+                        .getMethod("getWebApplicationContext", ServletContext.class)
+                        .invoke(null, servletContext);
+
+                servletContext.setAttribute("springContext", ctx);
+            } catch (Exception e) {
+                System.err.println("================================");
+                System.err.println("Spring non detecte: " + e.getMessage());
+                System.err.println("================================");
+            }
+
             String nom_package = servletContext.getInitParameter("nomPackage");
 
             Utilitaire.recupererClassesAvecAnnotation(new Utilitaire(nom_package,
