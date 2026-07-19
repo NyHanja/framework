@@ -4,10 +4,14 @@ import java.io.*;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import jakarta.servlet.annotation.*;
+
 import java.lang.annotation.ElementType;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+
 import mg.itu.util.*;
 import java.util.*;
+import mg.itu.listener.ApplicationListener;
 import mg.itu.view.*;
 
 // @WebListener
@@ -16,9 +20,17 @@ public class FrontControllerServlet extends HttpServlet implements ServletContex
 
     Map<UrlMethod, Mapping> urlMapping;
 
+    Object applicationContext;
+
+
     public void init() throws ServletException {
         listeControllers = (List<String>) getServletContext().getAttribute("listeControllers");
         urlMapping = (Map<UrlMethod, Mapping>) getServletContext().getAttribute("urlMapping");
+
+        if(getServletContext().getAttribute("springContext") != null){
+            applicationContext = getServletContext().getAttribute("springContext");
+        }
+
     }
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
@@ -60,7 +72,17 @@ public class FrontControllerServlet extends HttpServlet implements ServletContex
             try {
                 Object instance = mapping.getClasse().getDeclaredConstructor().newInstance();
                 Method methode = mapping.getMethode();
-                Object resultat = methode.invoke(instance);
+
+                Object[] arguments = new Object[methode.getParameters().length];
+
+                // MIla jerena oe inona daholo ny parametres an'ilay methode
+                if(applicationContext != null){
+                    Utilitaire.creerArguments(methode, arguments, applicationContext);
+                }else{
+                    Utilitaire.creerArguments(methode, arguments);
+                }
+
+                Object resultat = methode.invoke(instance, arguments);
 
                 if (resultat instanceof ModelAndView) {
                     ModelAndView mv = (ModelAndView) resultat;
