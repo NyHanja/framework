@@ -6,7 +6,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URL;
+import com.google.gson.Gson;
 import java.util.*;
+
 
 public class Utilitaire {
     private String nom_package;
@@ -208,5 +210,9 @@ public class Utilitaire {
 
     // return urlMapping;
     // }
+
+    public static String convertToJson(Object object) {
+        return new Gson().toJson(object);
+    }
 
 }
