@@ -59,7 +59,7 @@ manampy annotation ray hafa niveau methode
 rehefa string le averiny de tsy mamadika to json tsony fa ra autres de mila manao to json any 
 amin'ny  framework
 
-> Sprint 7 (bending):
+> Sprint 7 (binding):
 Donnees avy any amin'ny vue no makany amin Controller
 ref mi-clique bouton de mandalo FrontController mi-verifier methode de sady mi-verifier oe misy 
 parametres ve tonga miaraka amin le requete
@@ -68,3 +68,6 @@ ra any am Controller manana save() avec parametres, alaina daoly ny anaran'ny pa
 de alaina ny nom de variable an le argument an le parametre an le save() de tonga de matcher-na fotsiny zay 
 mitovy. Ohatra oe save (String nom, String prenom, int age) de le requete mamerina donnees oe nom, prenom, age via an le formulaire
 de matcher-na ny nom sy ny nom.
+
+> Sprint 7 bis
+tokony oe afaka madray objet le methode ohatra oe save(Personne p)

@@ -7,8 +7,12 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URL;
 import com.google.gson.Gson;
-import java.util.*;
+import mg.itu.annotation.Param;
+import java.lang.reflect.Array;
 
+import jakarta.servlet.http.HttpServletRequest;
+
+import java.util.*;
 
 public class Utilitaire {
     private String nom_package;
@@ -172,21 +176,30 @@ public class Utilitaire {
         return urlMapping;
     }
 
-    public static void creerArguments(Method methode, Object[] arguments, Object applicationContext) {
+    public static void creerArguments(Method methode, Object[] arguments,
+            Object applicationContext, HttpServletRequest request) {
         for (int i = 0; i < methode.getParameters().length; i++) {
             Parameter p = methode.getParameters()[i];
+
+            // 1. Injection du contexte Spring
             if (applicationContext != null && p.getType().isAssignableFrom(applicationContext.getClass())) {
                 arguments[i] = applicationContext;
+
+                // 2. Binding + conversion de type
+            } else {
+                String nomChamp = p.isAnnotationPresent(Param.class)
+                        ? p.getAnnotation(Param.class).value()
+                        : p.getName();
+                arguments[i] = convertir(request.getParameter(nomChamp), p.getType());
             }
-
         }
     }
 
-    public static void creerArguments(Method methode, Object[] arguments) {
-        for (int i = 0; i < methode.getParameters().length; i++) {
-            Parameter p = methode.getParameters()[i];
-        }
-    }
+    // public static void creerArguments(Method methode, Object[] arguments) {
+    // for (int i = 0; i < methode.getParameters().length; i++) {
+    // Parameter p = methode.getParameters()[i];
+    // }
+    // }
 
     // SANS REFLEXION
 
@@ -213,6 +226,48 @@ public class Utilitaire {
 
     public static String convertToJson(Object object) {
         return new Gson().toJson(object);
+    }
+
+    private static Object valeurParDefaut(Class<?> type) {
+        // primitif : 0 / 0.0 / false ; objet : null
+        return type.isPrimitive() ? Array.get(Array.newInstance(type, 1), 0) : null;
+    }
+
+    private static Object convertir(String valeur, Class<?> type) {
+        if (type == String.class) {
+            return valeur; // null si absent
+        }
+
+        if (valeur == null || valeur.trim().isEmpty()) {
+            return valeurParDefaut(type);
+        }
+        valeur = valeur.trim();
+
+        try {
+            if (type == int.class || type == Integer.class)
+                return Integer.parseInt(valeur);
+            if (type == long.class || type == Long.class)
+                return Long.parseLong(valeur);
+            if (type == double.class || type == Double.class)
+                return Double.parseDouble(valeur);
+            if (type == float.class || type == Float.class)
+                return Float.parseFloat(valeur);
+            if (type == short.class || type == Short.class)
+                return Short.parseShort(valeur);
+            if (type == byte.class || type == Byte.class)
+                return Byte.parseByte(valeur);
+            if (type == boolean.class || type == Boolean.class) {
+                // une case HTML cochée envoie "on", pas "true"
+                return valeur.equalsIgnoreCase("true") || valeur.equalsIgnoreCase("on") || valeur.equals("1");
+            }
+            if (type == char.class || type == Character.class)
+                return valeur.charAt(0);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "Valeur invalide '" + valeur + "' pour le type " + type.getSimpleName());
+        }
+
+        return valeurParDefaut(type); // type non géré : on ne plante pas
     }
 
 }

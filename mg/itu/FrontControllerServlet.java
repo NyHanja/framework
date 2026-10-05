@@ -31,6 +31,7 @@ public class FrontControllerServlet extends HttpServlet {
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        request.setCharacterEncoding("UTF-8");
 
         String url = request.getRequestURI().substring(request.getContextPath().length());
         String method = request.getMethod();
@@ -73,27 +74,21 @@ public class FrontControllerServlet extends HttpServlet {
             Method methode = mapping.getMethode();
 
             Object[] arguments = new Object[methode.getParameters().length];
-            if (applicationContext != null) {
-                Utilitaire.creerArguments(methode, arguments, applicationContext);
-            } else {
-                Utilitaire.creerArguments(methode, arguments);
-            }
+            Utilitaire.creerArguments(methode, arguments, applicationContext, request);
 
             Object resultat = methode.invoke(instance, arguments);
 
-            // ---------- Mode API : JSON ----------
             if (methode.isAnnotationPresent(Api.class)) {
                 response.setContentType("application/json;charset=UTF-8");
                 PrintWriter out = response.getWriter();
                 if (resultat instanceof String) {
-                    out.print(resultat); // String : renvoye tel quel
+                    out.print(resultat);
                 } else {
-                    out.print(Utilitaire.convertToJson(resultat)); // autre : JSON
+                    out.print(Utilitaire.convertToJson(resultat));
                 }
                 return;
             }
 
-            // ---------- Mode vue ----------
             if (resultat instanceof ModelAndView) {
                 ModelAndView mv = (ModelAndView) resultat;
                 ViewResolver viewResolver = new ViewResolver();
