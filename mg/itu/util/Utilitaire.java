@@ -9,6 +9,7 @@ import java.net.URL;
 import com.google.gson.Gson;
 import mg.itu.annotation.Param;
 import java.lang.reflect.Array;
+import java.lang.reflect.Modifier;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -181,11 +182,13 @@ public class Utilitaire {
         for (int i = 0; i < methode.getParameters().length; i++) {
             Parameter p = methode.getParameters()[i];
 
-            // 1. Injection du contexte Spring
             if (applicationContext != null && p.getType().isAssignableFrom(applicationContext.getClass())) {
                 arguments[i] = applicationContext;
+            } else if (!estTypeSimple(p.getType())) {
+                Object objet = creerObjet(p.getType());
+                remplirObjet(objet, request);
+                arguments[i] = objet;
 
-                // 2. Binding + conversion de type
             } else {
                 String nomChamp = p.isAnnotationPresent(Param.class)
                         ? p.getAnnotation(Param.class).value()
@@ -194,35 +197,6 @@ public class Utilitaire {
             }
         }
     }
-
-    // public static void creerArguments(Method methode, Object[] arguments) {
-    // for (int i = 0; i < methode.getParameters().length; i++) {
-    // Parameter p = methode.getParameters()[i];
-    // }
-    // }
-
-    // SANS REFLEXION
-
-    // public static Map<String, Mapping> recupererUrlMapping(Utilitaire utilitaire)
-    // throws Exception {
-    // Map<String, Mapping> urlMapping = new HashMap<>();
-
-    // List<Class<?>> classes = recupererClasses(utilitaire.getNom_package());
-
-    // for (Class<?> classe : classes) {
-    // for (Method method : classe.getDeclaredMethods()) {
-
-    // if (method.isAnnotationPresent(UrlMapping.class)) {
-
-    // String url = (String) method.getAnnotation(UrlMapping.class).value();
-
-    // urlMapping.put(url, new Mapping(classe, method));
-    // }
-    // }
-    // }
-
-    // return urlMapping;
-    // }
 
     public static String convertToJson(Object object) {
         return new Gson().toJson(object);
@@ -268,6 +242,52 @@ public class Utilitaire {
         }
 
         return valeurParDefaut(type); // type non géré : on ne plante pas
+    }
+
+    // Vrai pour les types "simples" (int, String, Integer, List...), faux pour nos
+    // propres classes
+    private static boolean estTypeSimple(Class<?> type) {
+        return type.isPrimitive() || type.getName().startsWith("java.");
+    }
+
+    // Crée un objet vide du type demandé
+    private static Object creerObjet(Class<?> type) {
+        try {
+            return type.getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            throw new IllegalArgumentException(
+                    "Impossible de créer un objet " + type.getSimpleName()
+                            + " : il faut un constructeur sans argument",
+                    e);
+        }
+    }
+
+    // Remplit les attributs de l'objet avec les champs de même nom dans la requête
+    private static void remplirObjet(Object objet, HttpServletRequest request) {
+        for (Field f : objet.getClass().getDeclaredFields()) {
+
+            // on ignore les constantes et les attributs static
+            if (Modifier.isStatic(f.getModifiers()) || Modifier.isFinal(f.getModifiers())) {
+                continue;
+            }
+            // on ne gère que les types simples (String, int, double...)
+            if (!estTypeSimple(f.getType())) {
+                continue;
+            }
+
+            String valeur = request.getParameter(f.getName());
+            if (valeur == null) {
+                continue; // champ absent : l'attribut garde sa valeur actuelle
+            }
+
+            try {
+                f.setAccessible(true); // nécessaire car les attributs sont private
+                f.set(objet, convertir(valeur, f.getType()));
+            } catch (IllegalAccessException e) {
+                throw new IllegalArgumentException(
+                        "Impossible d'écrire l'attribut " + f.getName(), e);
+            }
+        }
     }
 
 }
