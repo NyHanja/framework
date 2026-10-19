@@ -71,3 +71,14 @@ de matcher-na ny nom sy ny nom.
 
 > Sprint 7 bis
 tokony oe afaka madray objet le methode ohatra oe save(Personne p)
+
+> Sprint 8 (upload fichier):
+On cree une nouvelle class MapFile qui contient plusieurs attribut: nom_fichier, extension, tableau bytes
+on fait ensuite un binding comme dans sprint 7, on verifie si le formulaire a un imput de meme nom qu'un parametre
+dans une fonction controller, on regarde si c'est de type MapFile. Si oui, on prend le nom depuis request, l'extension et le tableau
+de bytes
+ensuite quelque pqrt dans notre framework doit se trouver le chemin du dossier ou se trouvera le fichier uploade (properties ou je
+ne sais pas qu'est ce qui est mieux)
+
+> Sprint 9 (session):
+atao zay ahatonga ny session an'ny utilisateur ho disponible any amin'ny controlleur an'ny dev (test)

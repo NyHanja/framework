@@ -8,10 +8,16 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 import mg.itu.annotation.Api;
+import jakarta.servlet.annotation.MultipartConfig;
 import mg.itu.util.*;
 import java.util.*;
 import mg.itu.view.*;
 
+@MultipartConfig(
+    fileSizeThreshold = 1024 * 1024,       
+    maxFileSize = 10 * 1024 * 1024,         
+    maxRequestSize = 20 * 1024 * 1024       
+)
 public class FrontControllerServlet extends HttpServlet {
     List<String> listeControllers;
 
