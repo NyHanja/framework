@@ -15,6 +15,11 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.*;
 
+import jakarta.servlet.http.Part;
+import java.io.InputStream;
+import mg.itu.upload.MapFile;
+import mg.itu.upload.*;
+
 public class Utilitaire {
     private String nom_package;
     private String annotation;
@@ -178,21 +183,30 @@ public class Utilitaire {
     }
 
     public static void creerArguments(Method methode, Object[] arguments,
-            Object applicationContext, HttpServletRequest request) {
+            Object applicationContext, HttpServletRequest request) throws Exception {
         for (int i = 0; i < methode.getParameters().length; i++) {
             Parameter p = methode.getParameters()[i];
 
+            String nomChamp = p.isAnnotationPresent(Param.class)
+                    ? p.getAnnotation(Param.class).value()
+                    : p.getName();
+
+            // 1. Injection du contexte Spring
             if (applicationContext != null && p.getType().isAssignableFrom(applicationContext.getClass())) {
                 arguments[i] = applicationContext;
+
+                // 2. Fichier uploadé (doit passer AVANT le cas "objet")
+            } else if (p.getType() == MapFile.class) {
+                arguments[i] = creerMapFile(request, nomChamp);
+
+                // 3. Objet (Personne, Produit...)
             } else if (!estTypeSimple(p.getType())) {
                 Object objet = creerObjet(p.getType());
-                remplirObjet(objet, request);
+                remplirObjet(objet, request, "");
                 arguments[i] = objet;
 
+                // 4. Type simple
             } else {
-                String nomChamp = p.isAnnotationPresent(Param.class)
-                        ? p.getAnnotation(Param.class).value()
-                        : p.getName();
                 arguments[i] = convertir(request.getParameter(nomChamp), p.getType());
             }
         }
@@ -263,31 +277,91 @@ public class Utilitaire {
     }
 
     // Remplit les attributs de l'objet avec les champs de même nom dans la requête
-    private static void remplirObjet(Object objet, HttpServletRequest request) {
+    private static void remplirObjet(Object objet, HttpServletRequest request, String prefixe) {
         for (Field f : objet.getClass().getDeclaredFields()) {
 
-            // on ignore les constantes et les attributs static
             if (Modifier.isStatic(f.getModifiers()) || Modifier.isFinal(f.getModifiers())) {
                 continue;
             }
-            // on ne gère que les types simples (String, int, double...)
-            if (!estTypeSimple(f.getType())) {
-                continue;
-            }
 
-            String valeur = request.getParameter(f.getName());
-            if (valeur == null) {
-                continue; // champ absent : l'attribut garde sa valeur actuelle
-            }
+            String nomChamp = prefixe + f.getName(); // "nom", puis "emploi.nom"
 
             try {
-                f.setAccessible(true); // nécessaire car les attributs sont private
-                f.set(objet, convertir(valeur, f.getType()));
+                f.setAccessible(true);
+
+                if (estTypeSimple(f.getType())) {
+                    // attribut simple : on lit le champ de même nom
+                    String valeur = request.getParameter(nomChamp);
+                    if (valeur == null) {
+                        continue;
+                    }
+                    f.set(objet, convertir(valeur, f.getType()));
+
+                } else {
+                    if (!aDesParametres(request, nomChamp + ".")) {
+                        continue; // sinon l'attribut reste null
+                    }
+                    Object sousObjet = creerObjet(f.getType());
+                    remplirObjet(sousObjet, request, nomChamp + ".");
+                    f.set(objet, sousObjet);
+                }
+
             } catch (IllegalAccessException e) {
-                throw new IllegalArgumentException(
-                        "Impossible d'écrire l'attribut " + f.getName(), e);
+                throw new IllegalArgumentException("Impossible d'écrire l'attribut " + nomChamp, e);
             }
         }
+    }
+
+    private static boolean aDesParametres(HttpServletRequest request, String prefixe) {
+        for (String nom : Collections.list(request.getParameterNames())) {
+            if (nom.startsWith(prefixe)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Construit un MapFile à partir du champ fichier du formulaire (null si aucun
+    // fichier envoyé)
+    private static MapFile creerMapFile(HttpServletRequest request, String nomChamp) throws Exception {
+
+        // le formulaire doit être en multipart, sinon getPart() lève une exception
+        String contentType = request.getContentType();
+        if (contentType == null || !contentType.toLowerCase().startsWith("multipart/")) {
+            return null;
+        }
+
+        Part part = request.getPart(nomChamp);
+        if (part == null) {
+            return null; // pas de champ de ce nom dans le formulaire
+        }
+
+        String nomComplet = part.getSubmittedFileName();
+        if (nomComplet == null || nomComplet.isEmpty()) {
+            return null; // champ présent, mais aucun fichier choisi
+        }
+
+        // certains navigateurs envoient un chemin complet : on garde seulement le nom
+        nomComplet = nomComplet.replace('\\', '/');
+        nomComplet = nomComplet.substring(nomComplet.lastIndexOf('/') + 1);
+
+        // séparation nom / extension au dernier point : "photo.png" -> "photo" + "png"
+        String nom = nomComplet;
+        String extension = "";
+        int point = nomComplet.lastIndexOf('.');
+        if (point > 0) {
+            nom = nomComplet.substring(0, point);
+            extension = nomComplet.substring(point + 1);
+        }
+
+        byte[] bytes;
+        try (InputStream in = part.getInputStream()) {
+            bytes = in.readAllBytes();
+        }
+
+        MapFile mf = new MapFile(nom, extension, bytes);
+        mf.setDossier(request.getServletContext().getInitParameter("uploadDir"));
+        return mf;
     }
 
 }
