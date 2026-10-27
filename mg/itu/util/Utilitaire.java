@@ -342,45 +342,45 @@ public class Utilitaire {
 
     // Construit un MapFile à partir du champ fichier du formulaire (null si aucun
     // fichier envoyé)
-    // private static MapFile creerMapFile(HttpServletRequest request, String nomChamp) throws Exception {
+    private static MapFile creerMapFile(HttpServletRequest request, String nomChamp) throws Exception {
 
-    //     // le formulaire doit être en multipart, sinon getPart() lève une exception
-    //     String contentType = request.getContentType();
-    //     if (contentType == null || !contentType.toLowerCase().startsWith("multipart/")) {
-    //         return null;
-    //     }
+        // le formulaire doit être en multipart, sinon getPart() lève une exception
+        String contentType = request.getContentType();
+        if (contentType == null || !contentType.toLowerCase().startsWith("multipart/")) {
+            return null;
+        }
 
-    //     Part part = request.getPart(nomChamp);
-    //     if (part == null) {
-    //         return null; // pas de champ de ce nom dans le formulaire
-    //     }
+        Part part = request.getPart(nomChamp);
+        if (part == null) {
+            return null; // pas de champ de ce nom dans le formulaire
+        }
 
-    //     String nomComplet = part.getSubmittedFileName();
-    //     if (nomComplet == null || nomComplet.isEmpty()) {
-    //         return null; // champ présent, mais aucun fichier choisi
-    //     }
+        String nomComplet = part.getSubmittedFileName();
+        if (nomComplet == null || nomComplet.isEmpty()) {
+            return null; // champ présent, mais aucun fichier choisi
+        }
 
-    //     // certains navigateurs envoient un chemin complet : on garde seulement le nom
-    //     nomComplet = nomComplet.replace('\\', '/');
-    //     nomComplet = nomComplet.substring(nomComplet.lastIndexOf('/') + 1);
+        // certains navigateurs envoient un chemin complet : on garde seulement le nom
+        nomComplet = nomComplet.replace('\\', '/');
+        nomComplet = nomComplet.substring(nomComplet.lastIndexOf('/') + 1);
 
-    //     // séparation nom / extension au dernier point : "photo.png" -> "photo" + "png"
-    //     String nom = nomComplet;
-    //     String extension = "";
-    //     int point = nomComplet.lastIndexOf('.');
-    //     if (point > 0) {
-    //         nom = nomComplet.substring(0, point);
-    //         extension = nomComplet.substring(point + 1);
-    //     }
+        // séparation nom / extension au dernier point : "photo.png" -> "photo" + "png"
+        String nom = nomComplet;
+        String extension = "";
+        int point = nomComplet.lastIndexOf('.');
+        if (point > 0) {
+            nom = nomComplet.substring(0, point);
+            extension = nomComplet.substring(point + 1);
+        }
 
-    //     byte[] bytes;
-    //     try (InputStream in = part.getInputStream()) {
-    //         bytes = in.readAllBytes();
-    //     }
+        byte[] bytes;
+        try (InputStream in = part.getInputStream()) {
+            bytes = in.readAllBytes();
+        }
 
-    //     MapFile mf = new MapFile(nom, extension, bytes);
-    //     mf.setDossier(request.getServletContext().getInitParameter("uploadDir"));
-    //     return mf;
-    // }
+        MapFile mf = new MapFile(nom, extension, bytes);
+        mf.setDossier(request.getServletContext().getInitParameter("uploadDir"));
+        return mf;
+    }
 
 }
