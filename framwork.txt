@@ -81,4 +81,19 @@ ensuite quelque pqrt dans notre framework doit se trouver le chemin du dossier o
 ne sais pas qu'est ce qui est mieux)
 
 > Sprint 9 (session):
-atao zay ahatonga ny session an'ny utilisateur ho disponible any amin'ny controlleur an'ny dev (test)
+creer une classe session dans framework ou se trouvera un Map<String,Object>
+quand l'user a besoin de session il l'injecte dans ces methodes dans son controller et c'est le frontController du framework qui gere ca 
+ensuite
+
+> Sprint 10
+misy an le methode an le dev reny atao hoe tsy maintsy authentifie (connecte) le olona zay vao
+afaka mi-executer an le izy
+manao annotation (ex:auth) de jerena avy eo oe ra tsy misy an'iny de mandeha fotsiny ilay methode sinon mi-verifier anaty session
+oe authentifie sa tsia. Tenenina an le framework oe ty ny anaran le variable ana session verifier-nao. On utilise initparam.
+
+> Sprint 10bis
+tsy maintsy authentifie sy manana role zay vao afaka mi-executer
+manampy variable ray hitazomana an le role
+tsy maintsy authentifie zay vao manana role zay vao afaka mi-executer
+(tsy mety ra oe manana role nefa tsy authentifie)
+
