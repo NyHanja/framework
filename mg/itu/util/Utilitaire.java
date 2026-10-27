@@ -12,6 +12,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Modifier;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 
 import java.util.*;
 
@@ -19,6 +20,8 @@ import jakarta.servlet.http.Part;
 import java.io.InputStream;
 import mg.itu.upload.MapFile;
 import mg.itu.upload.*;
+
+import mg.itu.session.Session;
 
 public class Utilitaire {
     private String nom_package;
@@ -182,8 +185,10 @@ public class Utilitaire {
         return urlMapping;
     }
 
+    @SuppressWarnings("unchecked")
     public static void creerArguments(Method methode, Object[] arguments,
             Object applicationContext, HttpServletRequest request) throws Exception {
+                Session session = null;
         for (int i = 0; i < methode.getParameters().length; i++) {
             Parameter p = methode.getParameters()[i];
 
@@ -191,25 +196,39 @@ public class Utilitaire {
                     ? p.getAnnotation(Param.class).value()
                     : p.getName();
 
-            // 1. Injection du contexte Spring
             if (applicationContext != null && p.getType().isAssignableFrom(applicationContext.getClass())) {
                 arguments[i] = applicationContext;
 
-                // 2. Fichier uploadé (doit passer AVANT le cas "objet")
             } else if (p.getType() == MapFile.class) {
                 arguments[i] = creerMapFile(request, nomChamp);
 
-                // 3. Objet (Personne, Produit...)
-            } else if (!estTypeSimple(p.getType())) {
+            }  else if (p.getType() == Session.class) {
+                if (session == null) {
+                    HttpSession hs = request.getSession();
+
+                    Map<String, Session> sessions =
+                            (Map<String, Session>) request.getServletContext().getAttribute("sessions");
+                    if (sessions == null) {
+                        throw new IllegalStateException(
+                                "Map des sessions absente : ApplicationListener n'est pas declare dans web.xml");
+                    }
+
+                    session = sessions.computeIfAbsent(hs.getId(), id -> new Session(hs));
+                }
+                arguments[i] = session;
+            }
+            else if (!estTypeSimple(p.getType())) {
                 Object objet = creerObjet(p.getType());
                 remplirObjet(objet, request, "");
                 arguments[i] = objet;
 
-                // 4. Type simple
-            } else {
+            } 
+                
+            else {
                 arguments[i] = convertir(request.getParameter(nomChamp), p.getType());
             }
         }
+
     }
 
     public static String convertToJson(Object object) {
@@ -217,13 +236,13 @@ public class Utilitaire {
     }
 
     private static Object valeurParDefaut(Class<?> type) {
-        // primitif : 0 / 0.0 / false ; objet : null
+
         return type.isPrimitive() ? Array.get(Array.newInstance(type, 1), 0) : null;
     }
 
     private static Object convertir(String valeur, Class<?> type) {
         if (type == String.class) {
-            return valeur; // null si absent
+            return valeur;
         }
 
         if (valeur == null || valeur.trim().isEmpty()) {
@@ -323,45 +342,45 @@ public class Utilitaire {
 
     // Construit un MapFile à partir du champ fichier du formulaire (null si aucun
     // fichier envoyé)
-    private static MapFile creerMapFile(HttpServletRequest request, String nomChamp) throws Exception {
+    // private static MapFile creerMapFile(HttpServletRequest request, String nomChamp) throws Exception {
 
-        // le formulaire doit être en multipart, sinon getPart() lève une exception
-        String contentType = request.getContentType();
-        if (contentType == null || !contentType.toLowerCase().startsWith("multipart/")) {
-            return null;
-        }
+    //     // le formulaire doit être en multipart, sinon getPart() lève une exception
+    //     String contentType = request.getContentType();
+    //     if (contentType == null || !contentType.toLowerCase().startsWith("multipart/")) {
+    //         return null;
+    //     }
 
-        Part part = request.getPart(nomChamp);
-        if (part == null) {
-            return null; // pas de champ de ce nom dans le formulaire
-        }
+    //     Part part = request.getPart(nomChamp);
+    //     if (part == null) {
+    //         return null; // pas de champ de ce nom dans le formulaire
+    //     }
 
-        String nomComplet = part.getSubmittedFileName();
-        if (nomComplet == null || nomComplet.isEmpty()) {
-            return null; // champ présent, mais aucun fichier choisi
-        }
+    //     String nomComplet = part.getSubmittedFileName();
+    //     if (nomComplet == null || nomComplet.isEmpty()) {
+    //         return null; // champ présent, mais aucun fichier choisi
+    //     }
 
-        // certains navigateurs envoient un chemin complet : on garde seulement le nom
-        nomComplet = nomComplet.replace('\\', '/');
-        nomComplet = nomComplet.substring(nomComplet.lastIndexOf('/') + 1);
+    //     // certains navigateurs envoient un chemin complet : on garde seulement le nom
+    //     nomComplet = nomComplet.replace('\\', '/');
+    //     nomComplet = nomComplet.substring(nomComplet.lastIndexOf('/') + 1);
 
-        // séparation nom / extension au dernier point : "photo.png" -> "photo" + "png"
-        String nom = nomComplet;
-        String extension = "";
-        int point = nomComplet.lastIndexOf('.');
-        if (point > 0) {
-            nom = nomComplet.substring(0, point);
-            extension = nomComplet.substring(point + 1);
-        }
+    //     // séparation nom / extension au dernier point : "photo.png" -> "photo" + "png"
+    //     String nom = nomComplet;
+    //     String extension = "";
+    //     int point = nomComplet.lastIndexOf('.');
+    //     if (point > 0) {
+    //         nom = nomComplet.substring(0, point);
+    //         extension = nomComplet.substring(point + 1);
+    //     }
 
-        byte[] bytes;
-        try (InputStream in = part.getInputStream()) {
-            bytes = in.readAllBytes();
-        }
+    //     byte[] bytes;
+    //     try (InputStream in = part.getInputStream()) {
+    //         bytes = in.readAllBytes();
+    //     }
 
-        MapFile mf = new MapFile(nom, extension, bytes);
-        mf.setDossier(request.getServletContext().getInitParameter("uploadDir"));
-        return mf;
-    }
+    //     MapFile mf = new MapFile(nom, extension, bytes);
+    //     mf.setDossier(request.getServletContext().getInitParameter("uploadDir"));
+    //     return mf;
+    // }
 
 }

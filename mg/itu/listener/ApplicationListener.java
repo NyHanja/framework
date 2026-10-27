@@ -1,16 +1,22 @@
 package mg.itu.listener;
 
 import jakarta.servlet.*;
+import mg.itu.session.Session;
 import mg.itu.util.*;
+import jakarta.servlet.http.HttpSessionListener;
+import jakarta.servlet.*;
 
 import java.lang.annotation.ElementType;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import jakarta.servlet.http.HttpSessionEvent;
 
-public class ApplicationListener implements ServletContextListener {
+public class ApplicationListener implements ServletContextListener, HttpSessionListener {
     @Override
     public void contextInitialized(ServletContextEvent servletContextEvent) {
         ServletContext servletContext = servletContextEvent.getServletContext();
+        servletContext.setAttribute("sessions", new ConcurrentHashMap<String, Session>());
 
         List<String> listeControllers = new ArrayList<>();
         Map<UrlMethod, Mapping> urlMapping;
@@ -57,6 +63,19 @@ public class ApplicationListener implements ServletContextListener {
     @Override
     public void contextDestroyed(ServletContextEvent servletContextEvent) {
         servletContextEvent.getServletContext().log("## Arrêt de l'application ##");
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public void sessionDestroyed(HttpSessionEvent se) {
+        String id = se.getSession().getId();
+        Map<String, Session> sessions = (Map<String, Session>) se.getSession().getServletContext()
+                .getAttribute("sessions");
+
+        if (sessions != null) {
+            sessions.remove(id);
+            System.out.println("Session retiree de la Map : " + id);
+        }
     }
 
 }

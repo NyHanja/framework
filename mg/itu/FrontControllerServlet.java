@@ -9,19 +9,18 @@ import java.lang.reflect.Method;
 
 import mg.itu.annotation.Api;
 import jakarta.servlet.annotation.MultipartConfig;
+import mg.itu.annotation.Auth;
 import mg.itu.util.*;
 import java.util.*;
 import mg.itu.view.*;
+import mg.itu.session.Session;
 
-@MultipartConfig(
-    fileSizeThreshold = 1024 * 1024,       
-    maxFileSize = 10 * 1024 * 1024,         
-    maxRequestSize = 20 * 1024 * 1024       
-)
+@MultipartConfig(fileSizeThreshold = 1024 * 1024, maxFileSize = 10 * 1024 * 1024, maxRequestSize = 20 * 1024 * 1024)
 public class FrontControllerServlet extends HttpServlet {
     List<String> listeControllers;
 
     Map<UrlMethod, Mapping> urlMapping;
+    String cleAuth;
 
     Object applicationContext;
 
@@ -29,6 +28,21 @@ public class FrontControllerServlet extends HttpServlet {
     public void init() throws ServletException {
         listeControllers = (List<String>) getServletContext().getAttribute("listeControllers");
         urlMapping = (Map<UrlMethod, Mapping>) getServletContext().getAttribute("urlMapping");
+        cleAuth = getServletContext().getInitParameter("sessionAuth");
+
+        boolean aDesMethodesAuth = false;
+        if (urlMapping != null) {
+            for (Mapping m : urlMapping.values()) {
+                if (m.getMethode().isAnnotationPresent(Auth.class)) {
+                    aDesMethodesAuth = true;
+                    break;
+                }
+            }
+        }
+        if (aDesMethodesAuth && (cleAuth == null || cleAuth.trim().isEmpty())) {
+            throw new ServletException(
+                    "Des methodes @Auth existent mais l'init-param 'sessionAuth' est absent dans web.xml");
+        }
 
         if (getServletContext().getAttribute("springContext") != null) {
             applicationContext = getServletContext().getAttribute("springContext");
@@ -73,6 +87,12 @@ public class FrontControllerServlet extends HttpServlet {
                         + " | Fonction: " + e.getValue().getMethode().getName() + "</p>");
             }
             return;
+        }
+        if (mapping.getMethode().isAnnotationPresent(Auth.class) && !estAuthentifie(request)) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
+            response.setContentType("text/html;charset=UTF-8");
+            response.getWriter().println("<p>Authentification requise.</p>");
+            return; // la méthode n'est jamais exécutée
         }
 
         try {
@@ -120,6 +140,30 @@ public class FrontControllerServlet extends HttpServlet {
             response.setContentType("text/html;charset=UTF-8");
             response.getWriter().println("<p>Erreur lors de l'invocation de la methode : " + cause + "</p>");
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean estAuthentifie(HttpServletRequest request) {
+        // 1. Session Tomcat existante ? (false = ne pas en créer une)
+        HttpSession hs = request.getSession(false);
+        if (hs == null) {
+            return false;
+        }
+
+        // 2. Map des sessions du framework
+        Map<String, Session> sessions = (Map<String, Session>) getServletContext().getAttribute("sessions");
+        if (sessions == null) {
+            return false;
+        }
+
+        // 3. Notre Session pour cet identifiant
+        Session session = sessions.get(hs.getId());
+        if (session == null) {
+            return false;
+        }
+
+        // 4. La clé configurée est-elle présente ?
+        return session.get(cleAuth) != null;
     }
 
 }
