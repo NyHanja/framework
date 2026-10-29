@@ -10,6 +10,7 @@ import java.lang.reflect.Method;
 import mg.itu.annotation.Api;
 import jakarta.servlet.annotation.MultipartConfig;
 import mg.itu.annotation.Auth;
+import mg.itu.annotation.UrlMapping;
 import mg.itu.util.*;
 import java.util.*;
 import mg.itu.view.*;
@@ -21,6 +22,7 @@ public class FrontControllerServlet extends HttpServlet {
 
     Map<UrlMethod, Mapping> urlMapping;
     String cleAuth;
+    String cleRole;
 
     Object applicationContext;
 
@@ -29,21 +31,29 @@ public class FrontControllerServlet extends HttpServlet {
         listeControllers = (List<String>) getServletContext().getAttribute("listeControllers");
         urlMapping = (Map<UrlMethod, Mapping>) getServletContext().getAttribute("urlMapping");
         cleAuth = getServletContext().getInitParameter("sessionAuth");
+        cleRole = getServletContext().getInitParameter("sessionRole");
 
-        boolean aDesMethodesAuth = false;
+        boolean besoinAuth = false;
+        boolean besoinRole = false;
         if (urlMapping != null) {
             for (Mapping m : urlMapping.values()) {
-                if (m.getMethode().isAnnotationPresent(Auth.class)) {
-                    aDesMethodesAuth = true;
-                    break;
+                Auth a = m.getMethode().getAnnotation(Auth.class);
+                if (a != null) {
+                    besoinAuth = true;
+                    if (!a.role().isEmpty()) {
+                        besoinRole = true;
+                    }
                 }
             }
         }
-        if (aDesMethodesAuth && (cleAuth == null || cleAuth.trim().isEmpty())) {
+        if (besoinAuth && (cleAuth == null || cleAuth.trim().isEmpty())) {
             throw new ServletException(
                     "Des methodes @Auth existent mais l'init-param 'sessionAuth' est absent dans web.xml");
         }
-
+        if (besoinRole && (cleRole == null || cleRole.trim().isEmpty())) {
+            throw new ServletException(
+                    "Des methodes @Auth(role=...) existent mais l'init-param 'sessionRole' est absent dans web.xml");
+        }
         if (getServletContext().getAttribute("springContext") != null) {
             applicationContext = getServletContext().getAttribute("springContext");
         }
@@ -88,11 +98,30 @@ public class FrontControllerServlet extends HttpServlet {
             }
             return;
         }
-        if (mapping.getMethode().isAnnotationPresent(Auth.class) && !estAuthentifie(request)) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
-            response.setContentType("text/html;charset=UTF-8");
-            response.getWriter().println("<p>Authentification requise.</p>");
-            return; // la méthode n'est jamais exécutée
+        // ---------- Contrôle d'authentification et de rôle (@Auth) ----------
+        Auth auth = mapping.getMethode().getAnnotation(Auth.class);
+        if (auth != null) {
+            Session s = trouverSession(request);
+
+            // 1. Authentifié ? (un rôle seul ne suffit jamais)
+            if (s == null || s.get(cleAuth) == null) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
+                response.setContentType("text/html;charset=UTF-8");
+                response.getWriter().println("<p>Authentification requise.</p>");
+                return;
+            }
+
+            // 2. Rôle exigé ?
+            String roleRequis = auth.role();
+            if (!roleRequis.isEmpty()) {
+                Object roleUtilisateur = s.get(cleRole);
+                if (roleUtilisateur == null || !roleRequis.equals(roleUtilisateur.toString())) {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN); // 403
+                    response.setContentType("text/html;charset=UTF-8");
+                    response.getWriter().println("<p>Acces refuse : role insuffisant.</p>");
+                    return;
+                }
+            }
         }
 
         try {
@@ -143,27 +172,45 @@ public class FrontControllerServlet extends HttpServlet {
     }
 
     @SuppressWarnings("unchecked")
-    private boolean estAuthentifie(HttpServletRequest request) {
-        // 1. Session Tomcat existante ? (false = ne pas en créer une)
+    private Session trouverSession(HttpServletRequest request) {
         HttpSession hs = request.getSession(false);
         if (hs == null) {
-            return false;
+            return null;
         }
-
-        // 2. Map des sessions du framework
         Map<String, Session> sessions = (Map<String, Session>) getServletContext().getAttribute("sessions");
         if (sessions == null) {
-            return false;
+            return null;
         }
+        return sessions.get(hs.getId());
+    }
 
-        // 3. Notre Session pour cet identifiant
-        Session session = sessions.get(hs.getId());
-        if (session == null) {
-            return false;
-        }
+    // Réservée au rôle admin
+    @UrlMapping(value = "/admin-only", method = "GET")
+    @Auth(role = "admin")
+    public ModelAndView adminOnly(Session session) {
+        System.out.println(">>> /admin-only EXECUTE pour : " + session.get("user"));
+        ModelAndView mv = new ModelAndView("admin");
+        mv.addAttribut("user", session.get("user"));
+        return mv;
+    }
 
-        // 4. La clé configurée est-elle présente ?
-        return session.get(cleAuth) != null;
+    // API réservée au rôle admin, sans paramètre Session
+    @UrlMapping(value = "/api/admin-secret", method = "GET")
+    @Auth(role = "admin")
+    @Api
+    public String adminSecret() {
+        return "{\"secret\":\"admin\"}";
+    }
+
+    // Range un rôle SANS utilisateur : sert à tester le cas "rôle sans
+    // authentification"
+    @UrlMapping(value = "/faux-role", method = "GET")
+    public ModelAndView fauxRole(Session session) {
+        session.set("role", "admin");
+        ModelAndView mv = new ModelAndView("profil");
+        mv.addAttribut("user", session.get("user"));
+        mv.addAttribut("visites", session.get("visites"));
+        return mv;
     }
 
 }
