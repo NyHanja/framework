@@ -25,6 +25,7 @@ public class FrontControllerServlet extends HttpServlet {
     String cleRole;
 
     Object applicationContext;
+    Map<Class<?>, Object> controllers;
 
     @SuppressWarnings("unchecked")
     public void init() throws ServletException {
@@ -32,6 +33,7 @@ public class FrontControllerServlet extends HttpServlet {
         urlMapping = (Map<UrlMethod, Mapping>) getServletContext().getAttribute("urlMapping");
         cleAuth = getServletContext().getInitParameter("sessionAuth");
         cleRole = getServletContext().getInitParameter("sessionRole");
+        controllers = (Map<Class<?>, Object>) getServletContext().getAttribute("controllers");
 
         boolean besoinAuth = false;
         boolean besoinRole = false;
@@ -125,7 +127,10 @@ public class FrontControllerServlet extends HttpServlet {
         }
 
         try {
-            Object instance = mapping.getClasse().getDeclaredConstructor().newInstance();
+            Object instance = controllers.get(mapping.getClasse());
+            if (instance == null) {
+                throw new IllegalStateException("Controleur non instancie : " + mapping.getClasse().getName());
+            }
             Method methode = mapping.getMethode();
 
             Object[] arguments = new Object[methode.getParameters().length];

@@ -1,21 +1,22 @@
 package mg.itu.listener;
 
 import jakarta.servlet.*;
+import jakarta.servlet.http.HttpSessionEvent;
+import jakarta.servlet.http.HttpSessionListener;
 import mg.itu.session.Session;
 import mg.itu.util.*;
-import jakarta.servlet.http.HttpSessionListener;
-import jakarta.servlet.*;
 
 import java.lang.annotation.ElementType;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import jakarta.servlet.http.HttpSessionEvent;
 
 public class ApplicationListener implements ServletContextListener, HttpSessionListener {
     @Override
     public void contextInitialized(ServletContextEvent servletContextEvent) {
         ServletContext servletContext = servletContextEvent.getServletContext();
+
+        // Map unique pour toute l'application : id de la HttpSession -> Session du framework
         servletContext.setAttribute("sessions", new ConcurrentHashMap<String, Session>());
 
         List<String> listeControllers = new ArrayList<>();
@@ -48,6 +49,23 @@ public class ApplicationListener implements ServletContextListener, HttpSessionL
                     new Utilitaire(nom_package, "mg.itu.annotation.UrlMapping", ElementType.METHOD));
 
             servletContext.setAttribute("urlMapping", urlMapping);
+
+            // Un seul objet par classe de contrôleur (singleton)
+            // (ce bloc vient APRES l'affectation de urlMapping)
+            Map<Class<?>, Object> controllers = new ConcurrentHashMap<>();
+            for (Mapping m : urlMapping.values()) {
+                Class<?> classe = m.getClasse();
+                if (!controllers.containsKey(classe)) {
+                    try {
+                        controllers.put(classe, classe.getDeclaredConstructor().newInstance());
+                    } catch (Exception e) {
+                        throw new Exception("Impossible d'instancier le controleur " + classe.getName()
+                                + " : il faut un constructeur public sans argument (" + e + ")");
+                    }
+                }
+            }
+            servletContext.setAttribute("controllers", controllers);
+
         } catch (Exception e) {
 
             System.err.println("================================");
